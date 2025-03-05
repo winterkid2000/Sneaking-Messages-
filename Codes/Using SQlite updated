@@ -1,0 +1,69 @@
+import sqlite3
+import os
+import tkinter as tk
+from tkinter import scrolledtext
+import threading
+import time
+
+# 카카오톡 데이터베이스 경로 (사용자마다 다를 수 있음)
+KAKAO_DB_PATH = os.path.expanduser(r'~\AppData\Local\Kakao\KakaoTalk\KakaoTalk.db')
+
+class KakaoReaderApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("카카오톡 메시지 뷰어")
+        self.root.geometry("600x400")
+
+        self.text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=70, height=20, font=("Arial", 10))
+        self.text_area.pack(pady=10)
+
+        self.refresh_button = tk.Button(root, text="메시지 업데이트", command=self.update_messages)
+        self.refresh_button.pack()
+
+        self.running = True
+        self.thread = threading.Thread(target=self.auto_update, daemon=True)
+        self.thread.start()
+
+    def get_latest_kakao_message(self):
+        """카카오톡 데이터베이스에서 최근 메시지를 가져옴"""
+        if not os.path.exists(KAKAO_DB_PATH):
+            return "❌ 카카오톡 데이터베이스를 찾을 수 없습니다."
+
+        try:
+            conn = sqlite3.connect(KAKAO_DB_PATH)
+            cursor = conn.cursor()
+
+            # 가장 최근 5개 메시지 가져오기
+            cursor.execute("SELECT chat_id, user_id, message, created_at FROM chat_messages ORDER BY created_at DESC LIMIT 5")
+            messages = cursor.fetchall()
+
+            conn.close()
+
+            result = "\n".join([f"📩 {chat[1]}: {chat[2]} (시간: {chat[3]})" for chat in messages])
+            return result
+
+        except Exception as e:
+            return f"⚠️ 오류 발생: {e}"
+
+    def update_messages(self):
+        """메시지를 GUI 창에 업데이트"""
+        new_messages = self.get_latest_kakao_message()
+        self.text_area.delete(1.0, tk.END)
+        self.text_area.insert(tk.END, new_messages)
+
+    def auto_update(self):
+        """5초마다 자동으로 메시지 업데이트"""
+        while self.running:
+            self.update_messages()
+            time.sleep(5)
+
+    def on_close(self):
+        """프로그램 종료 시 스레드 정리"""
+        self.running = False
+        self.root.quit()
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = KakaoReaderApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_close)
+    root.mainloop()
