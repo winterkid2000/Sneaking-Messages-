@@ -1,0 +1,41 @@
+import sqlite3
+import os
+import time
+
+# 카카오톡 DB 경로 (사용자 계정에 따라 다를 수 있음)
+KAKAO_DB_PATH = os.path.expanduser(r'~\AppData\Local\Kakao\KakaoTalk\KakaoTalk.db')
+
+def get_latest_kakao_message():
+    """카카오톡 데이터베이스에서 가장 최근 메시지 가져오기"""
+    if not os.path.exists(KAKAO_DB_PATH):
+        print("❌ 카카오톡 데이터베이스를 찾을 수 없습니다.")
+        return None
+
+    try:
+        # 데이터베이스 연결
+        conn = sqlite3.connect(KAKAO_DB_PATH)
+        cursor = conn.cursor()
+
+        # 가장 최근 메시지 가져오기
+        cursor.execute("SELECT chat_id, user_id, message, created_at FROM chat_messages ORDER BY created_at DESC LIMIT 5")
+        messages = cursor.fetchall()
+
+        conn.close()
+
+        return messages
+
+    except Exception as e:
+        print(f"⚠️ 오류 발생: {e}")
+        return None
+
+if __name__ == "__main__":
+    print("📩 카카오톡 메시지 감지 중...")
+    
+    while True:
+        latest_messages = get_latest_kakao_message()
+        if latest_messages:
+            for chat in latest_messages:
+                chat_id, user_id, message, created_at = chat
+                print(f"\n📝 [채팅 ID: {chat_id}] {user_id}: {message} (시간: {created_at})")
+        
+        time.sleep(5)  # 5초마다 확인
